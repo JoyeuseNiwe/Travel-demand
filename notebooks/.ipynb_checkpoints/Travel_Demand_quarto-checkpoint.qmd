@@ -1,0 +1,324 @@
+---
+title: Travel Demand Trends to Tech Hubs (EDA and Hypothesis testing)
+author:
+  - name: "Joyeuse & Grace & Natacha"
+    affiliation: "Data Analysts"
+date: "2025-06-30"
+format: 
+  revealjs:
+    height: 1100
+    width: 1200
+    center: true
+    page-layout: full
+    self-contained: true
+    transition: slide
+    code-fold: true
+    code-tools: true
+    code-block-bg: true
+    code-block-border-left: "#31BAE9"
+    number-sections: false
+    number-tables: true
+    toc: false
+    toc-location: left
+    toc-title: Contents
+jupyter: python3
+---
+
+
+## Introduction
+
+In this notebook, we perform an exploratory and descriptive analysis of the **Travel Demand Dataset**, using flight data accessed via the Amadeus API. The project aims to uncover travel trends to key global tech hubs—**San Francisco, London, Bangalore, Singapore, and Tel Aviv**—with the goal of informing strategic decisions for travel brands.
+
+This analysis focuses on key variables such as **flight price**, **number of stops**, **travel time**, and **available seats**. Through data visualization and summary statistics, we explore underlying patterns and relationships in the data. This foundational work is critical for identifying trends, spotting potential biases, and guiding future modeling or policy-focused analysis.
+
+## Objectives
+
+- Analyze flight demand and pricing trends across major tech cities.
+- Understand how attributes like **destination**, **stop type**, and **travel time** influence flight prices.
+- Use statistical tests to evaluate whether differences across groups (e.g., destinations or stop types) are significant.
+- Provide actionable insights and recommendations to help travel brands make data-informed decisions.
+
+
+## Exploratory Data Analysis (EDA)
+
+We begin our analysis by importing core Python libraries including `pandas`, `numpy`, `seaborn`, `matplotlib.pyplot`, `plotly.express`, and `os`. These tools support efficient data manipulation, numerical analysis, visualization, and directory management. Warnings are suppressed to ensure a cleaner output during rendering.
+
+To maintain a reproducible workflow, we define directory paths for storing raw data, processed files, results, and documentation. The cleaned dataset is loaded from the processed directory into a Pandas DataFrame for analysis.
+
+## Dataset Overview
+
+The dataset contains **7,870 rows and 8 columns**, covering both numerical and categorical flight-related variables such as:
+
+- **Price (USD)**
+- **Number of Stops**
+- **Available Seats**
+- **Travel Time**
+- **Destination**
+- **Airline**
+- **Departure Date**
+
+Preprocessing includes converting the `Departure Date` column to datetime format and cleaning the `Price (USD)` field to numeric.
+
+## Summary Statistics
+
+- **Numerical variables** reveal a wide range in price (from under \$80 to over \$17,000), and most flights have 1 stop with 7–9 seats available.
+- **Categorical variables** show 5 unique destinations and 53 different airlines, allowing for rich segmentation and comparison.
+- **Travel Time** is stored in `timedelta` format and analyzed in hours for correlation and visualization purposes.
+
+This EDA phase sets the foundation for statistical testing by uncovering distributions, group differences, and potential relationships within the dataset.
+
+
+```{python}
+#| echo: false
+import pandas as pd 
+import numpy as np 
+import os 
+import seaborn as sns
+import plotly.express as px
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+#| echo: false
+# Get working directory 
+current_dir = os.getcwd()
+
+# Go one directory up to the root directory 
+project_root_dir = os.path.dirname(current_dir)
+
+data_dir = os.path.join(project_root_dir, 'data')
+raw_dir = os.path.join(data_dir,'raw')
+processed_dir = os.path.join(data_dir,'processed')
+
+# Define paths to results folder 
+results_dir = os.path.join(project_root_dir,'results')
+
+# Define paths to docs folder 
+docs_dir = os.path.join(project_root_dir,'docs') 
+
+#Create directories if they do not exist 
+os.makedirs(raw_dir,exist_ok= True)
+os.makedirs(processed_dir,exist_ok= True)
+os.makedirs(results_dir,exist_ok= True)
+os.makedirs(data_dir,exist_ok= True)
+```
+```{python}
+#| echo: false
+#| output: false
+travel_demand_filename = os.path.join(processed_dir, 'Travel_cleaned.csv')
+df = pd.read_csv(travel_demand_filename)
+df.head(10)
+```
+
+```{python}
+#| echo: false
+#| output: false
+df['Departure Date'] = pd.to_datetime(df['Departure Date'])
+df['Price (USD) '] = df['Price (USD) '].replace('[\$,]', '', regex=True).astype(float)
+```
+
+## Key Insights from Visualizations
+
+## Average Flight Prices to Tech Hubs
+
+This bar chart shows the average flight price to each tech hub.
+
+- **Insight:** Tel Aviv and Singapore have the highest average prices, while San Francisco and London are more affordable.
+- **Implication:** Dynamic pricing strategies should consider geographic pricing variation to stay competitive.
+
+
+```{python}
+#| echo: false
+#| output: true
+
+# Clean column names to avoid KeyErrors
+df.columns = df.columns.str.strip()
+
+# Group and calculate mean price by destination
+avg_prices = df.groupby('Destination')['Price (USD)'].mean().sort_values(ascending=False)
+
+# Create plot
+plt.figure(figsize=(10, 6))
+sns.barplot(x=avg_prices.values, y=avg_prices.index, palette='Greens')
+
+# Add titles and labels
+plt.title('Average Flight Prices to Tech Hubs from New York (July)', fontsize=14)
+plt.xlabel('Average Price (USD)')
+plt.ylabel('Destination')
+plt.tight_layout()
+
+plt.savefig(os.path.join(results_dir, 'average_flight_prices_by_destination.png'))
+plt.savefig(os.path.join(results_dir, 'average_flight_prices_by_destination.jpg'))
+plt.show()
+```
+
+```{python}
+#| echo: false
+#| output: false
+df['Travel Time'].dtype
+```
+
+```{python}
+#| echo: false
+#| output: false
+df['Travel Time'] = pd.to_timedelta(df['Travel Time'], errors='coerce')
+```
+## Flight Price vs. Travel Time
+
+A scatterplot showing the relationship between travel time and price across destinations.
+
+- **Insight:** Longer flights generally cost more, though the pattern varies by city.
+- **Implication:** Duration-based pricing could optimize revenue and better reflect flight complexity.
+
+
+```{python}
+#| echo: false
+#| output: true
+
+# Convert Travel Time to minutes
+df['Travel Time (min)'] = df['Travel Time'].dt.total_seconds() / 60
+
+# Create scatterplot
+plt.figure(figsize=(10, 6))
+sns.scatterplot(data=df, x='Travel Time (min)', y='Price (USD)', hue='Destination', alpha=0.6)
+
+# Labels and formatting
+plt.title('Flight Price vs. Travel Time by Destination')
+plt.xlabel('Travel Time (minutes)')
+plt.ylabel('Price (USD)')
+plt.legend(title='Destination', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Save
+plt.tight_layout()
+plt.savefig(os.path.join(results_dir, "scatter_price_vs_travel_time.png"))
+plt.savefig(os.path.join(results_dir, "scatter_price_vs_travel_time.jpg"))
+plt.show()
+```
+
+## Flight Stop Distribution per Destination
+
+A grouped bar chart comparing number of stops per destination.
+
+- **Insight:** Bangalore and Tel Aviv often require 2+ stops, while London and San Francisco have more nonstop options.
+- **Implication:** Destinations with fewer nonstop flights may be less appealing to time-sensitive travelers and could benefit from improved routing or pricing incentives.
+
+
+```{python}
+#| echo: false
+#| output: true
+
+# Map Number of Stops to categories for clarity
+df['Stop Type'] = df['Number of Stops'].map({
+    0: 'Nonstop',
+    1: '1 Stop',
+    2: '2+ Stops'
+})
+
+# Group data by Destination and Stop Type, counting flights
+stop_counts = df.groupby(['Destination', 'Stop Type']).size().reset_index(name='Count')
+
+# Plot bar chart
+plt.figure(figsize=(10, 6))
+sns.barplot(data=stop_counts, x='Destination', y='Count', hue='Stop Type', palette='Greens')
+
+# Labels and title
+plt.title('Flight Stop Distribution per Destination')
+plt.xlabel('Destination')
+plt.ylabel('Number of Flights')
+plt.legend(title='Number of Stops')
+
+plt.tight_layout()
+plt.savefig(os.path.join(results_dir, "bar_flight_stops_per_city.png"))
+plt.savefig(os.path.join(results_dir, "bar_flight_stops_per_city.jpg"))
+plt.show()
+```
+
+## Average Flight Prices Over Time
+
+A line plot showing average daily prices per destination.
+
+- **Insight:** Price fluctuations vary across cities, with some showing consistent price increases or dips.
+- **Implication:** Pricing teams can use these trends to forecast demand and run targeted promotions during dips or peaks.
+
+```{python}
+#| echo: false
+#| output: true
+
+# Convert Departure Date to datetime if not already
+df['Departure Date'] = pd.to_datetime(df['Departure Date'])
+
+# Calculate average price by date and destination
+price_trends = df.groupby(['Departure Date', 'Destination'])['Price (USD)'].mean().reset_index()
+
+plt.figure(figsize=(14, 7))
+sns.lineplot(data=price_trends, x='Departure Date', y='Price (USD)', hue='Destination', marker='o', palette='tab10')
+plt.title('Average Flight Prices Over Time by Destination', fontsize=14)
+plt.xlabel('Departure Date')
+plt.ylabel('Average Price (USD)')
+plt.xticks(rotation=45)
+plt.tight_layout()
+
+plt.savefig(os.path.join(results_dir, 'price_trends_over_time.png'))
+plt.savefig(os.path.join(results_dir, 'price_trends_over_time.jpg'))
+
+plt.show()
+```
+
+## Travel Time Distribution by Destination
+
+Boxplot illustrating the spread and median of travel durations per city.
+
+- **Insight:** Singapore and Bangalore have longer and more variable travel times. London and San Francisco have shorter, more stable durations.
+- **Implication:** Consider offering enhanced services or bundles for longer routes to improve traveler satisfaction.
+
+```{python}
+#| echo: false
+#| output: true
+
+plt.figure(figsize=(12, 7))
+sns.boxplot(data=df, x='Destination', y='Travel Time', palette='pastel')
+plt.title('Travel Time Distribution by Destination', fontsize=14)
+plt.xlabel('Destination')
+plt.ylabel('Travel Time (minutes)')
+plt.tight_layout()
+
+plt.savefig(os.path.join(results_dir, 'travel_time_distribution.png'))
+plt.savefig(os.path.join(results_dir, 'travel_time_distribution.jpg'))
+
+plt.show()
+```
+
+## Insights from Hypothesis Testing
+
+-  **Flight prices significantly vary across destinations.**  
+  → Some tech hubs (like Singapore or Tel Aviv) consistently have higher prices, suggesting pricing is influenced by distance, demand, or airline competition.
+
+-  **Flight prices also differ by number of stops.**  
+  → Nonstop flights tend to be more expensive, while multi-stop flights are more affordable but may offer lower convenience.
+
+-  **There is a positive correlation between travel time and price.**  
+  → Longer travel durations are moderately associated with higher prices, suggesting airlines adjust pricing based on route length.
+
+---
+
+## Recommendations
+
+- **Set different prices for each destination.**  
+  Some cities are much more expensive to fly to—adjust prices to match demand and travel costs.
+
+- **Price flights based on number of stops.**  
+  Nonstop flights are more convenient and can be priced higher, while multi-stop flights can attract budget travelers.
+
+- **Consider travel time in pricing.**  
+  Longer flights often cost more. Make sure the price reflects the duration, and offer better services on long routes.
+
+---
+
+## Conclusion
+
+There are clear differences in flight prices depending on where the flight goes, how many stops it has, and how long it takes. These insights show that pricing should not be the same for every route. By using this data, airlines and travel platforms can set smarter prices, meet traveler needs better, and increase profits.
+
+
+
